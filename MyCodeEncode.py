@@ -6,6 +6,7 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 from ReedSolomon import ReedSolomon
+import Video_Frame
 
 
 def show_matrix(array):  # 显示矩阵（DEBUG用）
@@ -68,7 +69,7 @@ class MyCode:
         # print(self.canWirteSum)
         # show_matrix(self.BaseCodeMatrix+0.5*self.canWrite)
         self.canWirteSum = self.MyCodeSize**2-3*16*16  # 单位：B
-        print(self.canWirteSum)
+        # print(self.canWirteSum)
 
     def put_pointpos(self, CodeMatrix, PointPos, posX, posY):
         # print(PointPos)
@@ -108,12 +109,12 @@ class MyCode:
                 cv2.rectangle(img, (i*self.CellSize, j*self.CellSize),
                               ((i+1)*self.CellSize, (j+1)*self.CellSize),
                               color[MyCodeMatrix[j][i]], thickness=-1)
-        cv2.imwrite("frames\\"+str(index)+".jpg", img)
+        cv2.imwrite("encode_frames_output\\"+str(index)+".jpg", img)
 
 
 if __name__ == "__main__":
-    shutil.rmtree("frames", True)
-    os.mkdir("frames")
+    shutil.rmtree("encode_frames_output", True)
+    os.mkdir("encode_frames_output")
 
     # 初始化
     NewCode = MyCode()
@@ -123,7 +124,7 @@ if __name__ == "__main__":
     ErrorSizeEachFrame = 192
     MessageEachFrame = int(canWirteSum/4)-ErrorSizeEachFrame
 
-    data = "abcdefghijlmnopqrstuvwxyzabcdefghijlmnopqrstuvwxyzabcdefghijlmnopqrstuvwxyz"*10
+    data = "abcdefghijlmnopqrstuvwxyz"*1000
     index = 0
     reed_solomon = ReedSolomon(error_size=ErrorSizeEachFrame)
     while len(data) > MessageEachFrame:
@@ -133,4 +134,7 @@ if __name__ == "__main__":
             message=batch_data, error_size=ErrorSizeEachFrame)), index)
         index += 1
     NewCode.summon_pic(NewCode.summon_MyCode(reed_solomon.encode(
-        message=data.ljust(MessageEachFrame, ' '), error_size=ErrorSizeEachFrame)), index)
+        message=data.ljust(MessageEachFrame, '\0'), error_size=ErrorSizeEachFrame)), index)
+
+    Video_Frame.frame_to_video()
+    
