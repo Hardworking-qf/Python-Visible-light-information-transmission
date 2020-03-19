@@ -1,6 +1,27 @@
-﻿import cv2
+﻿import shutil
+import os
+import cv2
 import numpy as np
 import math
+from ReedSolomon import ReedSolomon
+import Video_Frame
+
+CodeSize = 64
+FrameSize = CodeSize+8
+
+error_size = 192
+
+canWrite = np.zeros((FrameSize, FrameSize))
+for i in range(4, 20):
+    canWrite[i] = np.insert(
+        np.zeros(40), 20, np.ones(CodeSize-32))
+for i in range(20, FrameSize-20):
+    canWrite[i] = np.insert(
+        np.zeros(8), 4, np.ones(CodeSize))
+    #self.canWirteSum += self.MyCodeSize
+for i in range(FrameSize-20, FrameSize-4):
+    canWrite[i] = np.insert(
+        np.zeros(24), 20, np.ones(CodeSize-16))
 
 
 def show_img(img, winname='OpenCV'):  # debug用
@@ -171,84 +192,122 @@ def summon_pic(CodeMatrix, CellSize, FrameSize):
     cv2.imwrite('result.png', img)
 
 
-img = cv2.imread('128.jpg')
-#img = cv2.GaussianBlur(img, (11,11), 1)
-gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)  # 把输入图像灰度化
-#gray=cv2.GaussianBlur(gray, (7,7),7)
-ret, thresh = cv2.threshold(gray, 110, 255, cv2.THRESH_BINARY)  # 二值化
-thresh_copy = thresh.copy()
-print("阈值：", ret)
-cv2.imwrite('b.png', thresh)
-contours, hierarchy = cv2.findContours(
-    thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)  # 轮廓查找
-print("边缘数量：", len(contours))
-parentIdx, ic = -1, 0
-minRect = []
-for i in range(len(contours)):  # 识别定位点
-    if hierarchy[0][i][2] != -1 and ic == 0:
-        parentIdx, ic = i, ic+1
-    elif hierarchy[0][i][2] != -1:
-        ic += 1
-    elif hierarchy[0][i][2] == -1:
-        ic, parentIdx = 0, -1
-        parentIdx = -1
-    Rect = cv2.minAreaRect(contours[parentIdx])
-    if isQrPointPos(Rect, thresh_copy):
-        # PointPos.append(contours[parentIdx])
-        minRect.append(Rect)
+def ResultMatrixToList(ResultMatrix, canWrite, FrameSize):
+    result = []
+    count = 0
+    tempresult = 0
+    for i in range(FrameSize):
+        for j in range(FrameSize):
+            if canWrite[i][j] == 1:
+                tempresult <<= 2
+                if ResultMatrix[i][j] != 0:
+                    tempresult += (ResultMatrix[i][j]-1)
+                else:
+                    tempresult += 2  # 白色当绿色算
+                count += 1
+                if count == 4:
+                    count = 0
+                    result.append(tempresult)
+                    tempresult = 0
+    return result
+    pass
+
+
+def FrameToMessage(index, canWrite):
+    img = cv2.imread('decode_frames_input/'+str(index)+'.jpg')
+    #img = cv2.GaussianBlur(img, (11,11), 1)
+    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)  # 把输入图像灰度化
+    #gray=cv2.GaussianBlur(gray, (7,7),7)
+    ret, thresh = cv2.threshold(gray, 110, 255, cv2.THRESH_BINARY)  # 二值化
+    thresh_copy = thresh.copy()
+    #print("阈值：", ret)
+    cv2.imwrite('b.png', thresh)
+    contours, hierarchy = cv2.findContours(
+        thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)  # 轮廓查找
+    #print("边缘数量：", len(contours))
     parentIdx, ic = -1, 0
-print("矩形：", minRect)
-# print(angle(minRect[0][0], minRect[1][0], minRect[2][0]))
-# print(PointPos)
-# 0           1
-#
-#
-#
-# 2
-angles = [three_point_angle(minRect[0][0], minRect[1][0], minRect[2][0]),
-          three_point_angle(minRect[1][0], minRect[2][0], minRect[0][0]),
-          three_point_angle(minRect[2][0], minRect[0][0], minRect[1][0])]
-# print(angles)
-PosPoint0 = None
-PosPoint1and2 = []
-CellSize = 0  # 单位：像素
-for i in range(3):
-    if 80 < angles[i] < 100:
-        PosPoint0 = [minRect[i][0][0], minRect[i][0][1]]
-    else:
-        PosPoint1and2.append([minRect[i][0][0], minRect[i][0][1]])
-    CellSize += (minRect[i][1][0]+minRect[i][1][1])
-CellSize /= (6*14)
-PosPoint1, PosPoint2 = None, None
-for point in PosPoint1and2:
-    deltaX, deltaY = point[0]-PosPoint0[0], point[1]-PosPoint0[1]
-    if deltaX > deltaY:
-        PosPoint1 = point
-    else:
-        PosPoint2 = point
-# print(PosPoint0, PosPoint1, PosPoint2)
-PosPoint = np.array([PosPoint0, PosPoint1, PosPoint2], dtype=np.float32)
-print(PosPoint, CellSize)
-#CodeSize = int(math.sqrt((PosPoint1[0]-PosPoint0[0]) ** 2 +
-#                         (PosPoint1[1]-PosPoint0[1]) ** 2)/CellSize)+14
-CodeSize = 64
-FrameSize = CodeSize+8
-print(CodeSize)
+    minRect = []
+    for i in range(len(contours)):  # 识别定位点
+        if hierarchy[0][i][2] != -1 and ic == 0:
+            parentIdx, ic = i, ic+1
+        elif hierarchy[0][i][2] != -1:
+            ic += 1
+        elif hierarchy[0][i][2] == -1:
+            ic, parentIdx = 0, -1
+            parentIdx = -1
+        Rect = cv2.minAreaRect(contours[parentIdx])
+        if isQrPointPos(Rect, thresh_copy):
+            # PointPos.append(contours[parentIdx])
+            minRect.append(Rect)
+        parentIdx, ic = -1, 0
+    #print("矩形：", minRect)
+    # print(angle(minRect[0][0], minRect[1][0], minRect[2][0]))
+    # print(PointPos)
+    # 0           1
+    #
+    #
+    #
+    # 2
+    decoded_block = ''
+    try:
+        angles = [three_point_angle(minRect[0][0], minRect[1][0], minRect[2][0]),
+                  three_point_angle(
+                      minRect[1][0], minRect[2][0], minRect[0][0]),
+                  three_point_angle(minRect[2][0], minRect[0][0], minRect[1][0])]
+        # print(angles)
+        PosPoint0 = None
+        PosPoint1and2 = []
+        for i in range(3):
+            if 80 < angles[i] < 100:
+                PosPoint0 = [minRect[i][0][0], minRect[i][0][1]]
+            else:
+                PosPoint1and2.append([minRect[i][0][0], minRect[i][0][1]])
+        PosPoint1, PosPoint2 = None, None
+        for point in PosPoint1and2:
+            deltaX, deltaY = point[0]-PosPoint0[0], point[1]-PosPoint0[1]
+            if deltaX > deltaY:
+                PosPoint1 = point
+            else:
+                PosPoint2 = point
+        # print(PosPoint0, PosPoint1, PosPoint2)
+        PosPoint = np.array(
+            [PosPoint0, PosPoint1, PosPoint2], dtype=np.float32)
+        # CodeSize = int(math.sqrt((PosPoint1[0]-PosPoint0[0]) ** 2 +
+        #                         (PosPoint1[1]-PosPoint0[1]) ** 2)/CellSize)+14
+        CodeSize = 64
+        FrameSize = CodeSize+8
+        # print(CodeSize)
 
-AffineCellSize = 12  # 仿射变换后的格子大小（单位：像素）
-AffinePosPoint = np.array([[AffineCellSize*11, AffineCellSize*11],
-                           [AffineCellSize*(FrameSize-11), AffineCellSize*11],
-                           [AffineCellSize*11, AffineCellSize*(FrameSize-11)]], dtype=np.float32)  # 仿射变换后的坐标
-print(AffinePosPoint)
-AffineM = cv2.getAffineTransform(PosPoint, AffinePosPoint)
-AffineResult = cv2.warpAffine(img, AffineM, (0, 0))[
-    :AffineCellSize*FrameSize, :AffineCellSize*FrameSize]
+        AffineCellSize = 12  # 仿射变换后的格子大小（单位：像素）
+        AffinePosPoint = np.array([[AffineCellSize*11, AffineCellSize*11],
+                                   [AffineCellSize*(FrameSize-11),
+                                    AffineCellSize*11],
+                                   [AffineCellSize*11, AffineCellSize*(FrameSize-11)]], dtype=np.float32)  # 仿射变换后的坐标
+        # print(AffinePosPoint)
+        AffineM = cv2.getAffineTransform(PosPoint, AffinePosPoint)
+        AffineResult = cv2.warpAffine(img, AffineM, (0, 0))[
+            :AffineCellSize*FrameSize, :AffineCellSize*FrameSize]
+
+        show_Analyze_Result(cv2.GaussianBlur(AffineResult.copy(),
+                                             (5, 5), 3), AffineCellSize, FrameSize)
+
+        DecodeResult = Decode(cv2.GaussianBlur(
+            AffineResult.copy(), (5, 5), 3), AffineCellSize, FrameSize)
+        reed_solomon = ReedSolomon(error_size)
+        encoded_block = ResultMatrixToList(DecodeResult, canWrite, FrameSize)
+        decoded_block = reed_solomon.decode(encoded_block, error_size)
+        print(index)
+    except:
+        pass
+    return decoded_block
 
 
-show_Analyze_Result(cv2.GaussianBlur(AffineResult.copy(),
-                                     (5, 5), 3), AffineCellSize, FrameSize)
-
-DecodeResult = Decode(cv2.GaussianBlur(
-    AffineResult.copy(), (5, 5), 3), AffineCellSize, FrameSize)
-
-summon_pic(DecodeResult, AffineCellSize, FrameSize)
+if __name__ == "__main__":
+    shutil.rmtree("decode_frames_input", True)
+    os.mkdir("decode_frames_input")
+    Video_Frame.video_to_frame()
+    DecodeResult = ""
+    for i in range(len(os.listdir("decode_frames_input\\"))):
+        DecodeResult += FrameToMessage(i, canWrite=canWrite)
+    print(DecodeResult.strip('\0'))
+    input()

@@ -10,22 +10,15 @@ class ReedSolomon:
         self.generator_polynomial = Polynomial.generator(error_size=error_size)
         self.GF = self.polyObject.GF
 
-    def encode(self, message: str, error_size: int) -> list:
+    def encode(self, message: list, error_size: int) -> list:
         """
         用RS校验码 将信息编码
-        :message：传入的原始信息: 
+        :message：传入的原始信息:
         :param error_size: 整形错误位数
         :return: 以校验位作为字节的信息
         """
 
-        # 创建一个缓冲区来保存信息和校验位
-        buffer_size = (len(message) + error_size)
-        buffer = [0] * buffer_size
-
-        # 将信息编码进缓冲区
-        for position in range(len(message)):
-            char = message[position]
-            buffer[position] = ord(char)
+        buffer = message+[0]*error_size
 
         # 对于每个字符，将字符的字节与生成多项式中的适当项相乘
         # 在缓冲区末尾添加错误位
@@ -35,11 +28,10 @@ class ReedSolomon:
             # 不能计算log0
             if char:
                 for poly_position in range(len(self.generator_polynomial)):
-                    buffer[position + poly_position] ^= self.GF.gfMul(self.generator_polynomial[poly_position], char)
+                    buffer[position + poly_position] ^= self.GF.gfMul(
+                        self.generator_polynomial[poly_position], char)
 
-        for position in range(len(message)):
-            char = message[position]
-            buffer[position] = ord(char)
+        buffer = message+buffer[len(message):]
 
         return buffer
 
@@ -60,7 +52,8 @@ class ReedSolomon:
             x = self.GF.gfPow(2, erasures[i])
 
             for j in range(len(forney_syndromes) - 1):
-                y = self.GF.gfMul(forney_syndromes[j], x) ^ forney_syndromes[j + 1]
+                y = self.GF.gfMul(
+                    forney_syndromes[j], x) ^ forney_syndromes[j + 1]
                 forney_syndromes[j] = y
             forney_syndromes.pop()
 
@@ -85,7 +78,8 @@ class ReedSolomon:
             # 偏差delta
             delta = forney_syndromes[i]
             for j in range(1, len(error_loc_polynomial)):
-                delta ^= self.GF.gfMul(error_loc_polynomial[-(j+1)], forney_syndromes[i - j])
+                delta ^= self.GF.gfMul(
+                    error_loc_polynomial[-(j+1)], forney_syndromes[i - j])
 
             # 计算多项式次幂
             last_known.append(0)
@@ -94,7 +88,8 @@ class ReedSolomon:
             if delta != 0:
                 if len(last_known) > len(error_loc_polynomial):
                     new_polynomial = last_known.scale(delta)
-                    last_known = error_loc_polynomial.scale(self.GF.gfInv(delta))
+                    last_known = error_loc_polynomial.scale(
+                        self.GF.gfInv(delta))
                     error_loc_polynomial = new_polynomial
 
                 error_loc_polynomial += last_known.scale(delta)
@@ -133,7 +128,8 @@ class ReedSolomon:
         error_locator = Polynomial.errorLocatorPolynomial(coefficient_pos)
 
         # 计算误差评估多项式
-        error_eval = Polynomial.errorEvaluatorPolynomial(syndrome_polynomial[::-1], error_locator, len(error_locator))
+        error_eval = Polynomial.errorEvaluatorPolynomial(
+            syndrome_polynomial[::-1], error_locator, len(error_locator))
 
         # 计算误差位置多项式
         error_positions = []
@@ -151,12 +147,14 @@ class ReedSolomon:
             error_loc_derivative_tmp = Polynomial([])
             for j in range(len(error_positions)):
                 if j != i:
-                    error_loc_derivative_tmp.append(1 ^ self.GF.gfMul(error_inv, error_positions[j]))
+                    error_loc_derivative_tmp.append(
+                        1 ^ self.GF.gfMul(error_inv, error_positions[j]))
 
             # 错误定位导数 Error locator derivative
             error_loc_derivative = 1
             for coef in error_loc_derivative_tmp:
-                error_loc_derivative = self.GF.gfMul(error_loc_derivative, coef)
+                error_loc_derivative = self.GF.gfMul(
+                    error_loc_derivative, coef)
 
             # 根据误差的倒数求出误差评价多项式
             y = error_eval.eval(error_inv)
@@ -178,30 +176,32 @@ class ReedSolomon:
         """
         buffer = copy.deepcopy(message)
 
-        #首先检查是否有擦除
+        # 首先检查是否有擦除
         erasures = []
         for position in range(len(buffer)):
             if buffer[position] < 0:
                 buffer[position] = 0
                 erasures.append(position)
-              
+
         # 错误太多 退出
         if len(erasures) > error_size:
             raise ReedSolomonError("Too many erasures3")
-        
+
         # 计算伴随多项式
         syndrome_polynomial = Polynomial.syndromePolynomial(buffer, error_size)
         if max(syndrome_polynomial) == 0:
-            return bytearray(buffer[:-error_size]).decode('utf-8','replace')
+            return bytearray(buffer[:-error_size]).decode('utf-8', 'replace')
 
-        forney_syndromes = self.forneySyndromes(syndrome_polynomial, erasures, buffer)
+        forney_syndromes = self.forneySyndromes(
+            syndrome_polynomial, erasures, buffer)
 
         error_list = self.findErrors(forney_syndromes, len(message))
         if error_list is None:
             raise ReedSolomonError("Could not find errors")
 
-        decoded_symbols = self.correct(buffer, syndrome_polynomial, (erasures + error_list))
-        return bytearray(decoded_symbols[:-error_size]).decode('utf-8','replace')
+        decoded_symbols = self.correct(
+            buffer, syndrome_polynomial, (erasures + error_list))
+        return bytearray(decoded_symbols[:-error_size]).decode('utf-8', 'replace')
 
 
 class ReedSolomonError(Exception):
@@ -210,13 +210,13 @@ class ReedSolomonError(Exception):
 
 
 if __name__ == "__main__":
-    #使用相同的ReedSolomon()对象进行编码和解码!误差大小和生成多项式必须匹配
+    # 使用相同的ReedSolomon()对象进行编码和解码!误差大小和生成多项式必须匹配
     reed_solomon = ReedSolomon(error_size=32)
     transmission = "qwertyuioplkjhgfdsamnzxbv./p;.lldsdwasdfgghjkjlikujyhtgrewqfewghduifvejofwejoepw[VEPBNVAEPUBNRAPVMADBVNPo pam OIHFUEFNWEFHEWPOFJIAEOPWGNWPORBNUPORGPAWMEFMAJIWOGNMARIGHNRIUAEGAP'EKFK[Oqffk[FKOPfe'fwkap[ghareolgnroesnaponvpwuoefh329t745pgijwovkmdhfusaihfasdjsdvnadjvnduivnueifhegfbvhdjnvsjncjxkcvnjskvbeuidvbnjsdnvxmcmkocsdnvfuefhweufnjdx vccxmvsebffisfnjxvcjsdv sjfbneujfnsdvndsv sdovehfuebgvsidjvgnsdjkvnaofhweiofndsjvksnfbkjsndvnoesvnk"
-    print("transmission len:",len(transmission))
+    print("transmission len:", len(transmission))
     encoded_block = reed_solomon.encode(message=transmission, error_size=32)
     print("Encoded message:", encoded_block)
-    print("Encoded len:",len(encoded_block))
+    print("Encoded len:", len(encoded_block))
 
     numbers_pos = list(range(0, len(encoded_block) - 16))
     positions = random.sample(numbers_pos, 8)
@@ -227,16 +227,3 @@ if __name__ == "__main__":
     print("Modified message:", encoded_block)
     decoded_block = reed_solomon.decode(encoded_block, error_size=32)
     print("Decoded message:", decoded_block)
-
-
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
