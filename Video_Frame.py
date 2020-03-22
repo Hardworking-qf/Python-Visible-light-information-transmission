@@ -33,7 +33,9 @@ def video_to_frame():
     video = cv2.VideoCapture('decode_input.mp4')  # 需要Decode的视频文件名
     framerate = int(video.get(5))  # FPS
     framenum = int(video.get(7))  # 总帧数
-    total_pic_count = int(framenum / framerate * pic_per_frame) + 1  # 向上取整
+    total_pic_count =0
+    if framerate:
+        total_pic_count = int(framenum / framerate * pic_per_frame)  # 向上取整
     for i in range(total_pic_count):
         video.set(cv2.CAP_PROP_POS_FRAMES, 1 * framerate * i / pic_per_frame)
         ret, frame = video.read()

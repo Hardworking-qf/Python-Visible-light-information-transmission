@@ -1,7 +1,7 @@
 from Polynomial import Polynomial
 import copy
 import random
-
+import codecs
 
 class ReedSolomon:
 
@@ -175,7 +175,6 @@ class ReedSolomon:
         :return:一个解码的消息，如果可能的话
         """
         buffer = copy.deepcopy(message)
-
         # 首先检查是否有擦除
         erasures = []
         for position in range(len(buffer)):
@@ -186,22 +185,22 @@ class ReedSolomon:
         # 错误太多 退出
         if len(erasures) > error_size:
             raise ReedSolomonError("Too many erasures3")
-
         # 计算伴随多项式
         syndrome_polynomial = Polynomial.syndromePolynomial(buffer, error_size)
         if max(syndrome_polynomial) == 0:
-            return bytearray(buffer[:-error_size]).decode('utf-8', 'replace')
-
+            return bytearray(buffer[:-error_size])#.decode('ascii',"ignore")
         forney_syndromes = self.forneySyndromes(
             syndrome_polynomial, erasures, buffer)
-
+        
         error_list = self.findErrors(forney_syndromes, len(message))
         if error_list is None:
+           
             raise ReedSolomonError("Could not find errors")
+        
 
         decoded_symbols = self.correct(
             buffer, syndrome_polynomial, (erasures + error_list))
-        return bytearray(decoded_symbols[:-error_size]).decode('utf-8', 'replace')
+        return bytearray(decoded_symbols[:-error_size])#.decode('ascii',"ignore")
 
 
 class ReedSolomonError(Exception):

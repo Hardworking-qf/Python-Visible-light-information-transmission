@@ -4,8 +4,10 @@ import cv2
 import numpy as np
 import math
 from ReedSolomon import ReedSolomon
+from MyCodeEncode import MyCode
 import Video_Frame
-
+import codecs
+import struct
 CodeSize = 64
 FrameSize = CodeSize+8
 
@@ -248,7 +250,7 @@ def FrameToMessage(index, canWrite):
     #
     #
     # 2
-    decoded_block = ''
+    decoded_block = b''
     try:
         angles = [three_point_angle(minRect[0][0], minRect[1][0], minRect[2][0]),
                   three_point_angle(
@@ -293,7 +295,24 @@ def FrameToMessage(index, canWrite):
 
         DecodeResult = Decode(cv2.GaussianBlur(
             AffineResult.copy(), (5, 5), 3), AffineCellSize, FrameSize)
+        
+        NewCode = MyCode()
+    # 总共可写canWriteSum个像素，即2*canWriteSum个位，canWriteSum/4个字节
+        canWirteSum = NewCode.canWirteSum
+    # 纠错码规定为每张192个
+        ErrorSizeEachFrame = 192
+        MessageEachFrame = int(canWirteSum/4)-ErrorSizeEachFrame
         reed_solomon = ReedSolomon(error_size)
+        data = []
+        binfile = open("1.bin", 'rb')
+        size = os.path.getsize("1.bin")
+
+        import binascii
+
+        for i in range(size):
+            data.append(int(binascii.b2a_hex(binfile.read(1)),16))
+        batch_data = data[MessageEachFrame*(index):MessageEachFrame*(index+1)]
+        reed_solomon.encode(batch_data,error_size)
         encoded_block = ResultMatrixToList(DecodeResult, canWrite, FrameSize)
         decoded_block = reed_solomon.decode(encoded_block, error_size)
         print(index)
@@ -306,8 +325,26 @@ if __name__ == "__main__":
     shutil.rmtree("decode_frames_input", True)
     os.mkdir("decode_frames_input")
     Video_Frame.video_to_frame()
-    DecodeResult = ""
+    DecodeResult = b""
     for i in range(len(os.listdir("decode_frames_input\\"))):
-        DecodeResult += FrameToMessage(i, canWrite=canWrite)
-    print(DecodeResult.strip('\0'))
-    input()
+        DecodeResult +=FrameToMessage(i, canWrite=canWrite)
+    filepath = "2.bin"
+   
+    with open(filepath,"wb") as binfile:
+        binfile.write(DecodeResult)
+    binfile.close()
+    with open("1.bin","rb") as f1:
+        with open("2.bin","rb") as f2:
+            with open("3.bin","wb") as f3:
+                while True:
+                    str1 = f1.read(1)
+                    str2 = f2.read(1)
+                    if str1==b"": break
+                    if str2==b"":continue
+                    str3 = (ord(str1)^ord(str2))
+                    f3.write(struct.pack("b",~str3))
+
+    f1.close()
+    f2.close()
+    f3.close()
+   
