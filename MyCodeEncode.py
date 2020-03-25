@@ -20,7 +20,7 @@ def summon_video():  # 生成视频
 
 
 class MyCode:
-    MyCodeSize = 64  # 二维码边长(单位：单元)
+    MyCodeSize = 48  # 二维码边长(单位：单元)
     EdgeWidth = 4  # 最小为4（单位：单元）
     CellSize = 12  # 每一个单元大小（单位：像素）
 
@@ -121,7 +121,7 @@ if __name__ == "__main__":
     # 总共可写canWriteSum个像素，即2*canWriteSum个位，canWriteSum/4个字节
     canWirteSum = NewCode.canWirteSum
     # 纠错码规定为每张192个
-    ErrorSizeEachFrame = 192
+    ErrorSizeEachFrame = 128
     MessageEachFrame = int(canWirteSum/4)-ErrorSizeEachFrame
 
     data = []
@@ -130,7 +130,7 @@ if __name__ == "__main__":
 
     import binascii
 
-    for i in range(size):
+    for i in range(10*MessageEachFrame):
         data.append(int(binascii.b2a_hex(binfile.read(1)),16))
     print(data)
 

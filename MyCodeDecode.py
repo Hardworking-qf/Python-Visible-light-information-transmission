@@ -4,14 +4,12 @@ import cv2
 import numpy as np
 import math
 from ReedSolomon import ReedSolomon
-from MyCodeEncode import MyCode
 import Video_Frame
-import codecs
-import struct
-CodeSize = 64
+
+CodeSize = 48
 FrameSize = CodeSize+8
 
-error_size = 192
+error_size = 128
 
 canWrite = np.zeros((FrameSize, FrameSize))
 for i in range(4, 20):
@@ -151,7 +149,7 @@ def three_point_angle(A, B, C):  # 求角BAC
 
 
 def Analyze_Color(color):
-    if color[0] < 127 and color[1] < 127 and color[2] < 127:  # 黑色
+    if color[0] < 100 and color[1] < 100 and color[2] < 100:  # 黑色
         return 1
     elif color[0] > 205 and color[1] > 205 and color[2] > 205:  # 白色
         return 0
@@ -250,7 +248,7 @@ def FrameToMessage(index, canWrite):
     #
     #
     # 2
-    decoded_block = b''
+    decoded_block = ''
     try:
         angles = [three_point_angle(minRect[0][0], minRect[1][0], minRect[2][0]),
                   three_point_angle(
@@ -276,8 +274,6 @@ def FrameToMessage(index, canWrite):
             [PosPoint0, PosPoint1, PosPoint2], dtype=np.float32)
         # CodeSize = int(math.sqrt((PosPoint1[0]-PosPoint0[0]) ** 2 +
         #                         (PosPoint1[1]-PosPoint0[1]) ** 2)/CellSize)+14
-        CodeSize = 64
-        FrameSize = CodeSize+8
         # print(CodeSize)
 
         AffineCellSize = 12  # 仿射变换后的格子大小（单位：像素）
@@ -293,26 +289,9 @@ def FrameToMessage(index, canWrite):
         show_Analyze_Result(cv2.GaussianBlur(AffineResult.copy(),
                                              (5, 5), 3), AffineCellSize, FrameSize)
 
-        DecodeResult = Decode(cv2.GaussianBlur(
-            AffineResult.copy(), (5, 5), 3), AffineCellSize, FrameSize)
-        
-        NewCode = MyCode()
-    # 总共可写canWriteSum个像素，即2*canWriteSum个位，canWriteSum/4个字节
-        canWirteSum = NewCode.canWirteSum
-    # 纠错码规定为每张192个
-        ErrorSizeEachFrame = 192
-        MessageEachFrame = int(canWirteSum/4)-ErrorSizeEachFrame
+        DecodeResult = Decode(
+            AffineResult.copy(), AffineCellSize, FrameSize)
         reed_solomon = ReedSolomon(error_size)
-        data = []
-        binfile = open("1.bin", 'rb')
-        size = os.path.getsize("1.bin")
-
-        import binascii
-
-        for i in range(size):
-            data.append(int(binascii.b2a_hex(binfile.read(1)),16))
-        batch_data = data[MessageEachFrame*(index):MessageEachFrame*(index+1)]
-        reed_solomon.encode(batch_data,error_size)
         encoded_block = ResultMatrixToList(DecodeResult, canWrite, FrameSize)
         decoded_block = reed_solomon.decode(encoded_block, error_size)
         print(index)
@@ -325,26 +304,7 @@ if __name__ == "__main__":
     shutil.rmtree("decode_frames_input", True)
     os.mkdir("decode_frames_input")
     Video_Frame.video_to_frame()
-    DecodeResult = b""
+    DecodeResult = []
     for i in range(len(os.listdir("decode_frames_input\\"))):
-        DecodeResult +=FrameToMessage(i, canWrite=canWrite)
-    filepath = "2.bin"
-   
-    with open(filepath,"wb") as binfile:
-        binfile.write(DecodeResult)
-    binfile.close()
-    with open("1.bin","rb") as f1:
-        with open("2.bin","rb") as f2:
-            with open("3.bin","wb") as f3:
-                while True:
-                    str1 = f1.read(1)
-                    str2 = f2.read(1)
-                    if str1==b"": break
-                    if str2==b"":continue
-                    str3 = (ord(str1)^ord(str2))
-                    f3.write(struct.pack("b",~str3))
-
-    f1.close()
-    f2.close()
-    f3.close()
-   
+        DecodeResult += FrameToMessage(i, canWrite=canWrite)
+    print(DecodeResult)

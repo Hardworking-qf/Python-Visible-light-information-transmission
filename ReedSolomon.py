@@ -1,7 +1,7 @@
 from Polynomial import Polynomial
 import copy
 import random
-import codecs
+
 
 class ReedSolomon:
 
@@ -175,6 +175,8 @@ class ReedSolomon:
         :return:一个解码的消息，如果可能的话
         """
         buffer = copy.deepcopy(message)
+        #print(message)
+
         # 首先检查是否有擦除
         erasures = []
         for position in range(len(buffer)):
@@ -185,22 +187,22 @@ class ReedSolomon:
         # 错误太多 退出
         if len(erasures) > error_size:
             raise ReedSolomonError("Too many erasures3")
+
         # 计算伴随多项式
         syndrome_polynomial = Polynomial.syndromePolynomial(buffer, error_size)
         if max(syndrome_polynomial) == 0:
-            return bytearray(buffer[:-error_size])#.decode('ascii',"ignore")
+            return list(buffer[:-error_size])#.decode('utf-8', 'replace')
+
         forney_syndromes = self.forneySyndromes(
             syndrome_polynomial, erasures, buffer)
-        
+
         error_list = self.findErrors(forney_syndromes, len(message))
         if error_list is None:
-           
             raise ReedSolomonError("Could not find errors")
-        
 
         decoded_symbols = self.correct(
             buffer, syndrome_polynomial, (erasures + error_list))
-        return bytearray(decoded_symbols[:-error_size])#.decode('ascii',"ignore")
+        return list(decoded_symbols[:-error_size])#.decode('utf-8', 'replace')
 
 
 class ReedSolomonError(Exception):
@@ -211,7 +213,7 @@ class ReedSolomonError(Exception):
 if __name__ == "__main__":
     # 使用相同的ReedSolomon()对象进行编码和解码!误差大小和生成多项式必须匹配
     reed_solomon = ReedSolomon(error_size=32)
-    transmission = "qwertyuioplkjhgfdsamnzxbv./p;.lldsdwasdfgghjkjlikujyhtgrewqfewghduifvejofwejoepw[VEPBNVAEPUBNRAPVMADBVNPo pam OIHFUEFNWEFHEWPOFJIAEOPWGNWPORBNUPORGPAWMEFMAJIWOGNMARIGHNRIUAEGAP'EKFK[Oqffk[FKOPfe'fwkap[ghareolgnroesnaponvpwuoefh329t745pgijwovkmdhfusaihfasdjsdvnadjvnduivnueifhegfbvhdjnvsjncjxkcvnjskvbeuidvbnjsdnvxmcmkocsdnvfuefhweufnjdx vccxmvsebffisfnjxvcjsdv sjfbneujfnsdvndsv sdovehfuebgvsidjvgnsdjkvnaofhweiofndsjvksnfbkjsndvnoesvnk"
+    transmission = [1,3,5,3,8,0,54,77,45,87,0,88,6,5,43,33,76]
     print("transmission len:", len(transmission))
     encoded_block = reed_solomon.encode(message=transmission, error_size=32)
     print("Encoded message:", encoded_block)
