@@ -125,12 +125,12 @@ if __name__ == "__main__":
     MessageEachFrame = int(canWirteSum/4)-ErrorSizeEachFrame
 
     data = []
-    binfile = open("1.bin", 'rb')
-    size = os.path.getsize("1.bin")
+    binfile = open("e1.bin", 'rb')
+    #size = os.path.getsize("e1.bin")
 
     import binascii
-
-    for i in range(10*MessageEachFrame):
+    sec=input()
+    for i in range(sec*5*MessageEachFrame):
         data.append(int(binascii.b2a_hex(binfile.read(1)),16))
     print(data)
 

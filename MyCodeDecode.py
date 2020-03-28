@@ -5,11 +5,15 @@ import numpy as np
 import math
 from ReedSolomon import ReedSolomon
 import Video_Frame
+import struct
 
 CodeSize = 48
 FrameSize = CodeSize+8
-
+canWirteBit = CodeSize**2-16*16*3
 error_size = 128
+BytePerFrame = int(canWirteBit/4-error_size)
+
+isStartReading = False
 
 canWrite = np.zeros((FrameSize, FrameSize))
 for i in range(4, 20):
@@ -214,6 +218,7 @@ def ResultMatrixToList(ResultMatrix, canWrite, FrameSize):
 
 
 def FrameToMessage(index, canWrite):
+    global isStartReading
     img = cv2.imread('decode_frames_input/'+str(index)+'.jpg')
     #img = cv2.GaussianBlur(img, (11,11), 1)
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)  # 把输入图像灰度化
@@ -286,8 +291,7 @@ def FrameToMessage(index, canWrite):
         AffineResult = cv2.warpAffine(img, AffineM, (0, 0))[
             :AffineCellSize*FrameSize, :AffineCellSize*FrameSize]
 
-        show_Analyze_Result(cv2.GaussianBlur(AffineResult.copy(),
-                                             (5, 5), 3), AffineCellSize, FrameSize)
+        show_Analyze_Result(AffineResult.copy(), AffineCellSize, FrameSize)
 
         DecodeResult = Decode(
             AffineResult.copy(), AffineCellSize, FrameSize)
@@ -295,8 +299,21 @@ def FrameToMessage(index, canWrite):
         encoded_block = ResultMatrixToList(DecodeResult, canWrite, FrameSize)
         decoded_block = reed_solomon.decode(encoded_block, error_size)
         print(index)
+        isStartReading = True
+        with open('v1.bin', 'ab+')as fp:
+            for i in range(BytePerFrame):
+                fp.write(struct.pack('B', 0xFF))
+        with open('1.bin','ab+')as fp:
+            for result in decoded_block:
+                fp.write(struct.pack('B',result))
     except:
-        pass
+        if isStartReading:
+            with open('v1.bin', 'ab+')as fp:
+                for i in range(BytePerFrame):
+                    fp.write(struct.pack('B', 0x00))
+            with open('1.bin','ab+')as fp:
+                for i in range(BytePerFrame):
+                    fp.write(struct.pack('B', 0x00))
     return decoded_block
 
 
@@ -307,4 +324,4 @@ if __name__ == "__main__":
     DecodeResult = []
     for i in range(len(os.listdir("decode_frames_input\\"))):
         DecodeResult += FrameToMessage(i, canWrite=canWrite)
-    print(DecodeResult)
+    #print(DecodeResult)
